@@ -1,0 +1,14 @@
+{
+  "name": "spacejam",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SpaceJam — galaxie simulation UI",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo \"No build step configured. Add your bundler config if needed.\"",
+    "test": "echo \"No tests configured.\""
+  },
+  "dependencies": {
+    "three": "^0.152.0"
+  }
+}
