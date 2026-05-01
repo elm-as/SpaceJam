@@ -7,7 +7,9 @@ C'est une vraie galère en fait l'espace...mais je m'en rends compte que mainten
 Et ne faites pas trop gaffes aux centres des galaxies qui se barrent....ou des étoiles qui partent en balades loins de leurs galaxies ou meme du bouton "collision" qui est censé simuler une collision. J'ai utilisé chatGPT pour voir un peu comment je pouvais gérer la collision, les forces et tout...parce qu'au début les étoiles se dispersaient car la physique etait vraiment très fausse, le référentiel galactique accéléré n'inclut pas les forces fictives, et les formules de vitesses circulaires/bulbe/halo sont incorrectes.
 BREF, avec chatGPT, j'ai eu au moins un semblant de réaliste et les centres des galaxies ne vont pas trop loins...
 STOOOOOOOOOOOP, je laisse la suite du README à CHATGPT. Merci
-<img width="1919" height="938" alt="Capture d&#39;écran 2026-04-30 133831" src="https://github.com/user-attachments/assets/716d1c92-9539-47f2-a1ff-f19334a9e362" />
+
+## Petit visuel des centres qui se barrent et de leurs étoiles qui les poursuivent
+<img width="1899" height="951" alt="Capture d&#39;écran 2026-04-30 142802" src="https://github.com/user-attachments/assets/fc551c2f-780d-49a3-b10b-9cb59fdf41dc" />
 
 Inspiration et compromis techniques
 Pour parvenir à une expérience suffisamment réaliste sans tomber dans une physique complexe, j’ai exploré des idées avec l’aide de modèles IA (ChatGPT). L’objectif était d’obtenir des comportements plausibles (fusions, effets de marée, mouvements autour des centres) tout en évitant les instabilités visuelles (centres qui s’éloignent trop, étoiles qui se dispersent). Le résultat est une approximation cohérente adaptée à une démonstration interactive. {https://chatgpt.com/share/69f4b2c6-e140-83ea-b633-bf66c3068587}
@@ -40,7 +42,7 @@ Note: ces descriptions donnent une vue rapide du rôle de chaque fichier; pour c
 
 
 PS : Certains fichiers contiennent du code générer par IA éditée, ces fichiers sont les suivants :
-- src/engine/physics-engine.js <img width="1899" height="951" alt="Capture d&#39;écran 2026-04-30 142802" src="https://github.com/user-attachments/assets/fc551c2f-780d-49a3-b10b-9cb59fdf41dc" />
+- src/engine/physics-engine.js 
 
 - src/renderer/shaders.js
 - src/ui.js
