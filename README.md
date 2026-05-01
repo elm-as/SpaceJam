@@ -12,8 +12,7 @@ STOOOOOOOOOOOP, je laisse la suite du README à CHATGPT. Merci
 <img width="1899" height="951" alt="Capture d&#39;écran 2026-04-30 142802" src="https://github.com/user-attachments/assets/fc551c2f-780d-49a3-b10b-9cb59fdf41dc" />
 
 Inspiration et compromis techniques
-Pour parvenir à une expérience suffisamment réaliste sans tomber dans une physique complexe, j’ai exploré des idées avec l’aide de modèles IA (ChatGPT). L’objectif était d’obtenir des comportements plausibles (fusions, effets de marée, mouvements autour des centres) tout en évitant les instabilités visuelles (centres qui s’éloignent trop, étoiles qui se dispersent). Le résultat est une approximation cohérente adaptée à une démonstration interactive. {https://chatgpt.com/share/69f4b2c6-e140-83ea-b633-bf66c3068587}
-
+Pour parvenir à une expérience suffisamment réaliste sans tomber dans une physique complexe, j’ai exploré des idées avec l’aide de modèles IA (ChatGPT). L’objectif était d’obtenir des comportements plausibles (fusions, effets de marée, mouvements autour des centres) tout en évitant les instabilités visuelles (centres qui s’éloignent trop, étoiles qui se dispersent). Le résultat est une approximation cohérente adaptée à une démonstration interactive. 
 Utilisation rapide
 - `git clone https://github.com/Elm-as/SpaceJam.git`
 - `cd SpaceJam`
