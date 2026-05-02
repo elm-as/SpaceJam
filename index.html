@@ -34,9 +34,13 @@
             left: 20px;
             padding: 16px 20px;
             width: 260px;
+            /* max-height est géré dynamiquement par UI.js selon la hauteur de l'écran */
             max-height: calc(100vh - 40px);
             overflow-y: auto;
+            overflow-x: hidden;
             z-index: 100;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.15) transparent;
         }
 
         #controls::-webkit-scrollbar { width: 4px; }
@@ -184,6 +188,13 @@
             margin-bottom: 5px;
         }
 
+        /* Mode compact (petits écrans) */
+        #controls.compact .section-label { margin: 6px 0 4px 0; font-size: 9px; }
+        #controls.compact .control-group { margin-bottom: 6px; }
+        #controls.compact .btn { padding: 6px 10px; margin-bottom: 3px; font-size: 11px; }
+        #controls.compact h2 { margin-bottom: 8px; font-size: 10px; }
+        #controls.compact .control-group label { font-size: 11px; margin-bottom: 3px; }
+
         #stats {
             position: fixed;
             top: 20px;
@@ -221,9 +232,9 @@
             font-variant-numeric: tabular-nums;
         }
 
-        .stat-row .val.fps { color: #34d399; }
+        .stat-row .val.fps    { color: #34d399; }
         .stat-row .val.energy { color: #60a5fa; }
-        .stat-row .val.count { color: #c084fc; }
+        .stat-row .val.count  { color: #c084fc; }
 
         #mode-indicator {
             position: fixed;
@@ -281,8 +292,12 @@
             <input type="range" id="g-slider" min="0.1" max="5" step="0.05" value="1">
         </div>
         <div class="control-group">
-            <label>Vitesse <span class="value" id="time-value">1,0x</span></label>
+            <label>Rotation (tscale) <span class="value" id="time-value">1,0x</span></label>
             <input type="range" id="time-slider" min="0.1" max="10" step="0.1" value="1">
+        </div>
+        <div class="control-group">
+            <label>Vitesse animation <span class="value" id="anim-value">1,0x</span></label>
+            <input type="range" id="anim-slider" min="0.1" max="5" step="0.1" value="1">
         </div>
         <div class="control-group">
             <label>Bloom <span class="value" id="bloom-value">2,00</span></label>
