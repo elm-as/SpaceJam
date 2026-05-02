@@ -75,7 +75,7 @@ SpaceJam/
 
 ---
 
-## Physique implémentée
+## Physique implémentée [ On dit merci qui ? ChatGPT :) ]
 
 ### Gravitation
 
