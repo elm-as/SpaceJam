@@ -37,7 +37,7 @@ Puis ouvrir : [http://localhost:8080](http://localhost:8080)
 
 ---
 
-## Contrôles
+## Contrôles [ J'ai probablement foiré certains trucs, surtout Zoom ]
 
 | Touche / Action | Effet |
 |---|---|
