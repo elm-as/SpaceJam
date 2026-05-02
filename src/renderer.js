@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-const MAX_PARTICLES = 30000;
+const MAX_PARTICLES = 50000;
 const MAX_BH = 50;
 
 const starVertexShader = `
@@ -21,7 +21,7 @@ const starVertexShader = `
         vAccretion = aAccretion;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_PointSize = aSize * (600.0 / -mvPosition.z);
-        gl_PointSize = clamp(gl_PointSize, 2.5, 32.0);
+        gl_PointSize = clamp(gl_PointSize, 1.0, 48.0);
         gl_Position = projectionMatrix * mvPosition;
     }
 `;
@@ -100,6 +100,12 @@ class Renderer {
         this._trails = [];
         this._trailUpdateCounter = 0;
         this._blackHoles = [];
+        this._lowPerf = false;
+        // Detect perf mode from URL: ?perf=low
+        if (typeof window !== 'undefined' && window.location && window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('perf') === 'low') this._lowPerf = true;
+        }
         this._initScene();
         this._initCamera();
         this._initRenderer();
@@ -118,7 +124,7 @@ class Renderer {
     }
 
     _addBackgroundStars() {
-        const count = 300;
+        const count = this._lowPerf ? 100 : 300;
         const geo = new THREE.BufferGeometry();
         const pos = new Float32Array(count * 3);
         for (let i = 0; i < count; i++) {
@@ -154,9 +160,13 @@ class Renderer {
     _initPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
+        // Reduced bloom in perf/low mode to save FPS when needed
+        const bloomStrength = this._lowPerf ? 1.0 : 2.2;
+        const bloomRadius = this._lowPerf ? 0.2 : 0.4;
+        const bloomThreshold = this._lowPerf ? 0.4 : 0.6;
         this.bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            2.2, 0.4, 0.6
+            bloomStrength, bloomRadius, bloomThreshold
         );
         this.composer.addPass(this.bloomPass);
     }
@@ -213,23 +223,6 @@ class Renderer {
         this.scene.add(new THREE.Points(this._bhGeo, this._bhMat));
     }
 
-    _getStarColor(dist, type) {
-        // Extended color palettes per galaxy type for richer visuals
-        const palettes = {
-            spiral: [0.4, 0.6, 1.0],
-            barred: [1.0, 0.75, 0.2],
-            elliptical: [1.0, 0.4, 0.4],
-            lenticular: [1.0, 0.3, 0.9],
-            irregular: [0.9, 0.95, 1.0],
-        };
-        const base = palettes[type] || [1.0, 1.0, 1.0];
-        const t = Math.min(dist / 1200, 1);
-        const r = base[0] * (1.0 - 0.5 * t) + 0.5 * t;
-        const g = base[1] * (1.0 - 0.5 * t) + 0.5 * t;
-        const b = base[2] * (1.0 - 0.5 * t) + 0.5 * t;
-        return [r, g, b];
-    }
-
     updateParticles(particles, galaxies, cameraPos) {
         const pos = this._starGeo.attributes.position.array;
         const sizes = this._starGeo.attributes.aSize.array;
@@ -238,6 +231,7 @@ class Renderer {
         const accretion = this._starGeo.attributes.aAccretion.array;
         let idx = 0;
         for (const s of particles) {
+            if (idx >= MAX_PARTICLES) break;
             const dx = s.x - cameraPos.x;
             const dy = s.y - cameraPos.y;
             const dz = s.z - cameraPos.z;
@@ -246,12 +240,20 @@ class Renderer {
             let lodFactor = 1.0;
             if (distCam > 1000) lodFactor = 0.4;
             else if (distCam > 500) lodFactor = 0.7;
+
             pos[idx*3] = s.x; pos[idx*3+1] = s.y; pos[idx*3+2] = s.z;
-            const dist = s.distFromCenter || 10;
-            const [r, g, b] = this._getStarColor(dist, s.galaxyType);
-            const speed = Math.sqrt(s.vx**2 + s.vy**2 + s.vz**2);
-            sizes[idx] = (2.0 + Math.min(speed * 0.2, 4.0)) * lodFactor;
+
+            // Utiliser la couleur pré-calculée si disponible, sinon fallback
+            const r = s.colorR ?? 1.0, g = s.colorG ?? 1.0, b = s.colorB ?? 1.0;
             colors[idx*3] = r; colors[idx*3+1] = g; colors[idx*3+2] = b;
+
+            // Taille : intrinsèque × vitesse × LOD, bornée pour que les TN restent dominants
+            const intrinsic = s.starSize ?? 1.0;
+            const speed = Math.sqrt(s.vx**2 + s.vy**2 + s.vz**2);
+            const rawSize = intrinsic * (1.5 + Math.min(speed * 0.1, 2.0)) * lodFactor;
+            sizes[idx] = Math.min(rawSize, 5.0); // jamais plus grand que le TN
+
+            const dist = s.distFromCenter || 10;
             alphas[idx] = (0.5 + Math.min(0.5, dist * 0.004)) * lodFactor;
             accretion[idx] = s.accretionGlow || 0;
             idx++;
