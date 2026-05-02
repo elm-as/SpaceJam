@@ -37,8 +37,6 @@ Note: ces descriptions donnent une vue rapide du rôle de chaque fichier; pour c
 PS : Certains fichiers contiennent du code générer par IA éditée, ces fichiers sont les suivants :
 - src/engine/physics-engine.js 
 - src/engine/galaxy-objets.js
-- src/engine/constants.js
-- src/renderer/shaders.js
 - src/ui.js
 
 Et certainement d'autres...je ne sais plus, mais j'ai passé beaucoup de temps à corriger certains dégâts
