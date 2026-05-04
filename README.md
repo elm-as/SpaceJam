@@ -157,6 +157,7 @@ Fichiers contenant du code assisté par IA (édité) :
 - `src/engine/galaxy-objects.js`
 - `src/engine/constants.js`
 - `src/ui.js`
+- `README.md`
 
 ---
 

@@ -4,16 +4,16 @@ import { G, SOFT_TIDAL, MERGE_DIST, MERGE_SPEED, GALAXY_TYPES, SIZE_PRESETS } fr
 const SOFT_GAL        = 10;
 const MAX_GALAXY_VEL  = 10;
 const CM_CORRECT_FREQ = 20;
-// Fréquence des collisions étoile-étoile (coûteux, 1 fois toutes les N steps)
 const STAR_COLL_FREQ  = 6;
 
 class PhysicsEngine {
     constructor() {
         this.galaxies = [];
+        this.freeStars = [];
+        this.freeBlackHoles = [];
         this.t        = 0;
         this.Gmult    = 1;
         this.tscale   = 1;
-        // Vitesse d'animation (affecte uniquement la simulation, indépendant de tscale)
         this.animSpeed = 1;
         this.enableTides = true;
         this._starFormationAccum = {};
@@ -29,6 +29,20 @@ class PhysicsEngine {
         this.galaxies.push(g); return g;
     }
     addGalaxy(x, y, z, vx, vy, vz, type, preset) { return this.add(x, y, z, vx, vy, vz, type, preset); }
+
+    addFreeBlackHole(x, y, z, mass) {
+        const bh = new BlackHole(x, y, z, mass);
+        bh.vx = 0; bh.vy = 0; bh.vz = 0;
+        bh.ax = 0; bh.ay = 0; bh.az = 0;
+        this.freeBlackHoles.push(bh);
+        return bh;
+    }
+
+    addFreeStar(x, y, z, vx, vy, vz) {
+        const s = new Star(x, y, z, vx, vy, vz);
+        this.freeStars.push(s);
+        return s;
+    }
 
     addRandom(cx, cy, cz, spread) {
         const types = Object.keys(GALAXY_TYPES);
@@ -49,9 +63,7 @@ class PhysicsEngine {
         }
     }
 
-    // ── Boucle principale Velocity-Verlet ─────────────────────────────────────
     step(dt) {
-        // animSpeed contrôle la vitesse globale d'animation (multiplicateur sur dt)
         const effectiveDt = dt * this.animSpeed;
         const sub = effectiveDt * this.tscale / 2;
         const Gval = G * this.Gmult;
@@ -93,14 +105,80 @@ class PhysicsEngine {
                 g.computeAccelerations(allBHs, alive, this.enableTides);
                 g.integrate(sub);
                 this._addStarsToGalaxy(g, sub);
-                // Collisions étoile-étoile (peu fréquent)
                 if (this._stepCount % STAR_COLL_FREQ === 0) {
                     g.checkStarCollisions();
                 }
             }
 
+            // Physics for free entities
+            for (const bh of this.freeBlackHoles) {
+                if (!bh.alive) continue;
+                bh.ax = 0; bh.ay = 0; bh.az = 0;
+                for (const g of alive) {
+                    const dx = g.x - bh.x, dy = g.y - bh.y, dz = g.z - bh.z;
+                    const r2 = dx * dx + dy * dy + dz * dz + SOFT_GAL * SOFT_GAL;
+                    const inv = 1 / (r2 * Math.sqrt(r2));
+                    bh.ax += Gval * g.Mtot * dx * inv;
+                    bh.ay += Gval * g.Mtot * dy * inv;
+                    bh.az += Gval * g.Mtot * dz * inv;
+                    
+                    // Reverse pull from free BH to galaxy
+                    g.ax -= Gval * bh.mass * dx * inv;
+                    g.ay -= Gval * bh.mass * dy * inv;
+                    g.az -= Gval * bh.mass * dz * inv;
+                }
+                
+                // Pull between free BHs
+                for (const obh of this.freeBlackHoles) {
+                    if (obh === bh || !obh.alive) continue;
+                    const dx = obh.x - bh.x, dy = obh.y - bh.y, dz = obh.z - bh.z;
+                    const r2 = dx * dx + dy * dy + dz * dz + 2.0;
+                    const inv = 1 / (r2 * Math.sqrt(r2));
+                    bh.ax += Gval * obh.mass * dx * inv;
+                    bh.ay += Gval * obh.mass * dy * inv;
+                    bh.az += Gval * obh.mass * dz * inv;
+                }
+
+                bh.vx += bh.ax * sub; bh.vy += bh.ay * sub; bh.vz += bh.az * sub;
+                bh.x += bh.vx * sub; bh.y += bh.vy * sub; bh.z += bh.vz * sub;
+            }
+
+            for (const s of this.freeStars) {
+                if (!s.alive) continue;
+                let ax = 0, ay = 0, az = 0;
+                for (const bh of allBHs) {
+                    const dx = bh.x - s.lx, dy = bh.y - s.ly, dz = bh.z - s.lz;
+                    const r2 = dx * dx + dy * dy + dz * dz + 2.0;
+                    const inv = 1 / (r2 * Math.sqrt(r2));
+                    ax += Gval * bh.mass * dx * inv;
+                    ay += Gval * bh.mass * dy * inv;
+                    az += Gval * bh.mass * dz * inv;
+                }
+                for (const g of alive) {
+                    const dx = g.x - s.lx, dy = g.y - s.ly, dz = g.z - s.lz;
+                    const r2 = dx * dx + dy * dy + dz * dz + SOFT_GAL * SOFT_GAL;
+                    const inv = 1 / (r2 * Math.sqrt(r2));
+                    ax += Gval * g.Mtot * dx * inv;
+                    ay += Gval * g.Mtot * dy * inv;
+                    az += Gval * g.Mtot * dz * inv;
+                }
+                s.lvx += ax * sub; s.lvy += ay * sub; s.lvz += az * sub;
+                s.lx += s.lvx * sub; s.ly += s.lvy * sub; s.lz += s.lvz * sub;
+                
+                // Accretion
+                for (const bh of allBHs) {
+                    const dx = bh.x - s.lx, dy = bh.y - s.ly, dz = bh.z - s.lz;
+                    if (dx*dx + dy*dy + dz*dz < bh.rTidal * bh.rTidal) {
+                        s.alive = false;
+                        bh.mass += s.size * 0.001;
+                        bh.mergedFlash = Math.min(1.0, bh.mergedFlash + 0.08);
+                    }
+                }
+            }
+
             this._mergeCheck(Gval);
             this._progressMerges(sub);
+            this._checkBHMergers();
 
             for (const g of this.galaxies) {
                 if (!g.alive) continue;
@@ -181,6 +259,40 @@ class PhysicsEngine {
         this._merges = remaining;
     }
 
+    _checkBHMergers() {
+        const allBHs = this.getBHs();
+        for (let i = 0; i < allBHs.length; i++) {
+            for (let j = i + 1; j < allBHs.length; j++) {
+                const a = allBHs[i], b = allBHs[j];
+                if (!a.alive || !b.alive) continue;
+                const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+                const mergeDist = Math.max(a.rh, b.rh) * 4.0; // un peu plus grand pour faciliter la fusion visuelle
+                if (dx*dx + dy*dy + dz*dz < mergeDist * mergeDist) {
+                    if (a.mass > b.mass) {
+                        a.mass += b.mass;
+                        a.mergedFlash = 1.0;
+                        b.alive = false;
+                        // Conserve la quantité de mouvement
+                        if (a.vx !== undefined && b.vx !== undefined) {
+                            a.vx = (a.vx * a.mass + b.vx * b.mass) / (a.mass + b.mass);
+                            a.vy = (a.vy * a.mass + b.vy * b.mass) / (a.mass + b.mass);
+                            a.vz = (a.vz * a.mass + b.vz * b.mass) / (a.mass + b.mass);
+                        }
+                    } else {
+                        b.mass += a.mass;
+                        b.mergedFlash = 1.0;
+                        a.alive = false;
+                        if (a.vx !== undefined && b.vx !== undefined) {
+                            b.vx = (a.vx * a.mass + b.vx * b.mass) / (a.mass + b.mass);
+                            b.vy = (a.vy * a.mass + b.vy * b.mass) / (a.mass + b.mass);
+                            b.vz = (a.vz * a.mass + b.vz * b.mass) / (a.mass + b.mass);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     _merge(a, b) {
         const mu = a.Mtot + b.Mtot;
         const mx = (a.x * a.Mtot + b.x * b.Mtot) / mu, my = (a.y * a.Mtot + b.y * b.Mtot) / mu, mz = (a.z * a.Mtot + b.z * b.Mtot) / mu;
@@ -189,20 +301,17 @@ class PhysicsEngine {
         const mR = Math.min(a.Mtot, b.Mtot) / Math.max(a.Mtot, b.Mtot);
         const muU = this._fusionParams.mu ?? mR, alU = this._fusionParams.align ?? 0.5, durM = this._fusionParams.duration ?? 8.0;
 
-        // Type de galaxie résultant selon le ratio de masse et l'alignement
         let tt;
         if (muU > 0.7) tt = 'elliptical';
         else if (muU > 0.3) tt = alU < 0.4 ? 'elliptical' : (Math.random() > 0.4 ? 'lenticular' : 'elliptical');
         else tt = a.Mtot > b.Mtot ? a.type : b.type;
 
-        // Héritage couleur : mélange pondéré par la masse
         const wA = a.Mtot / mu, wB = b.Mtot / mu;
         const mergedColor = [
             a.dominantColor[0] * wA + b.dominantColor[0] * wB,
             a.dominantColor[1] * wA + b.dominantColor[1] * wB,
             a.dominantColor[2] * wA + b.dominantColor[2] * wB,
         ];
-        // Après fusion : la galaxie vieillit légèrement (moins de gaz → moins d'étoiles bleues)
         const mergedAge = Math.min(1, (a.stellarAge * wA + b.stellarAge * wB) + 0.1);
 
         const preset = a.Mtot > b.Mtot ? a.preset : b.preset;
@@ -229,7 +338,6 @@ class PhysicsEngine {
                 const [nlvx, nlvy, nlvz] = merged._worldToLocalVel(vwx + p.vx - merged.vx, vwy + p.vy - merged.vy, vwz + p.vz - merged.vz);
                 const ns = new (s.constructor)(nlx, nly, nlz, nlvx, nlvy, nlvz);
                 ns.size = s.size;
-                // Spectral légèrement rougi (vieillissement par la fusion)
                 ns.spectral = Math.min(1, s.spectral + 0.05 * Math.random());
                 ms.push(ns);
             }
@@ -262,7 +370,6 @@ class PhysicsEngine {
                 R * Math.cos(theta), R * Math.sin(theta), (Math.random() - 0.5) * galaxy.Zh * 0.3,
                 -vc * Math.sin(theta) * 0.96, vc * Math.cos(theta) * 0.96, (Math.random() - 0.5) * vc * 0.01
             );
-            // Nouvelles étoiles : jeunes → plus bleues, petites à moyennes
             ns.size = 0.5 + Math.random() * 1.5;
             ns.spectral = Math.random() * 0.4;
             galaxy.stars.push(ns);
@@ -287,20 +394,38 @@ class PhysicsEngine {
         this._fusionParams = { mu: null, align: null, duration: null };
     }
 
-    getBHs() { return this.galaxies.filter(g => g.alive && g.bh?.alive).map(g => g.bh); }
+    getBHs() { 
+        return this.galaxies.filter(g => g.alive && g.bh?.alive).map(g => g.bh)
+                   .concat(this.freeBlackHoles.filter(bh => bh.alive)); 
+    }
 
     reset() {
-        this.galaxies = []; Galaxy._id = 0; BlackHole._id = 0;
+        this.galaxies = []; this.freeStars = []; this.freeBlackHoles = [];
+        Galaxy._id = 0; BlackHole._id = 0;
         this.t = 0; this._starFormationAccum = {}; this._merges = []; this._stepCount = 0;
     }
 
     stats() {
-        let stars = 0, bhs = 0;
+        let stars = this.freeStars.filter(s => s.alive).length;
+        let bhs = this.freeBlackHoles.filter(bh => bh.alive).length;
         for (const g of this.galaxies) { if (!g.alive) continue; stars += g.stars.filter(s => s.alive).length; if (g.bh?.alive) bhs++; }
         return { galaxies: this.galaxies.filter(g => g.alive).length, stars, bhs, t: this.t };
     }
 
-    getParticles()   { return this.galaxies.filter(g => g.alive).flatMap(g => g.getWorldStars()); }
+    getParticles() { 
+        const gStars = this.galaxies.filter(g => g.alive).flatMap(g => g.getWorldStars()); 
+        const fStars = this.freeStars.filter(s => s.alive).map(s => ({
+            x: s.lx, y: s.ly, z: s.lz,
+            glow: 0,
+            distFromCenter: 100,
+            galaxyType: 'free',
+            vx: s.lvx, vy: s.lvy, vz: s.lvz,
+            accretionGlow: 0,
+            starSize: s.size,
+            colorR: 1.0, colorG: 0.9, colorB: 0.8
+        }));
+        return gStars.concat(fStars);
+    }
     getElapsedTime() { return this.t; }
     get GMultiplier()      { return this.Gmult; }
     set GMultiplier(value) { this.Gmult = value; }
