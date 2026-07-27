@@ -34,14 +34,10 @@ function loop() {
 
     if (running) {
         phys.step(timeDirection * 0.016);
-        const particles = phys.getParticles();
-        const blackHoles = phys.getBHs();
-        renderer.updateParticles(particles, blackHoles, renderer.camera.position);
+        renderer.updateFromPhysics(phys, renderer.camera.position);
     } else if (stepOnce) {
         phys.step(timeDirection * 0.016);
-        const particles = phys.getParticles();
-        const blackHoles = phys.getBHs();
-        renderer.updateParticles(particles, blackHoles, renderer.camera.position);
+        renderer.updateFromPhysics(phys, renderer.camera.position);
         stepOnce = false;
     }
 
@@ -67,8 +63,8 @@ ui.on('pause',            (paused) => { running = !paused; });
 ui.on('toggleTrails',     () => { renderer.showTrails = !renderer.showTrails; });
 ui.on('invertTime',       (inverted) => { timeDirection = inverted ? -1 : 1; });
 ui.on('toggleTides',      (val) => { phys.enableTides = val; });
-ui.on('togglePerfMode',   (val) => { renderer.setLowPerf(val); });
-ui.on('bhMassChange',     (val) => { currentBHMass = val; });
+ui.on('toggleBarnesHut', (val) => { phys.enableBarnesHut = val; });
+ui.on('toggleNFW',       (val) => { phys.enableNFWHalo = val; });
 ui.on('step',             () => { stepOnce = true; });
 ui.on('multiScene', () => {
     phys.reset();
@@ -104,7 +100,6 @@ ui.on('addRandom', () => {
 });
 
 let placementStart = null;
-let currentBHMass = 1000;
 
 renderer.renderer.domElement.addEventListener('mousedown', (e) => {
     if (e.button === 0 && ui.placementMode) {
@@ -120,23 +115,7 @@ renderer.renderer.domElement.addEventListener('mouseup', (e) => {
         if (pos) {
             const vx = dx * 0.005;
             const vy = dy * -0.005;
-            if (ui.placementMode === 'free_bh') {
-                phys.addFreeBlackHole(pos.x, pos.y, pos.z, currentBHMass);
-            } else if (ui.placementMode === 'free_star') {
-                // Add multiple stars (controlled by the slider which uses currentBHMass temporarily)
-                const count = currentBHMass || 50;
-                for (let i = 0; i < count; i++) {
-                    const svx = vx * 5 + (Math.random() - 0.5) * 2;
-                    const svy = vy * 5 + (Math.random() - 0.5) * 2;
-                    const svz = (Math.random() - 0.5) * 2;
-                    const offx = (Math.random() - 0.5) * 15;
-                    const offy = (Math.random() - 0.5) * 15;
-                    const offz = (Math.random() - 0.5) * 15;
-                    phys.addFreeStar(pos.x + offx, pos.y + offy, pos.z + offz, svx, svy, svz);
-                }
-            } else {
-                phys.addGalaxy(pos.x, pos.y, pos.z, vx, vy, 0, ui.placementMode, SIZE_PRESETS[1]);
-            }
+            phys.addGalaxy(pos.x, pos.y, pos.z, vx, vy, 0, ui.placementMode, SIZE_PRESETS[1]);
             ui.exitPlacementMode();
         }
         placementStart = null;

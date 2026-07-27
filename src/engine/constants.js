@@ -2,8 +2,10 @@ export const G = 1;
 export const SOFT_BH = 2;
 export const SOFT_TIDAL = 12;
 
-export const MERGE_DIST  = 18;
-export const MERGE_SPEED = 4.0;
+// Seuils de fusion augmentés : les centres orbitent souvent vite,
+// on utilise la distance + un critère d'énergie relative plutôt que vitesse seule
+export const MERGE_DIST  = 18;   // était 5 — distance de déclenchement de la phase de merge
+export const MERGE_SPEED = 4.0;  // était 0.2 — vitesse relative max autorisée
 
 export const GALAXY_TYPES = {
     spiral:    { armRange: [2, 4], pitchRange: [0.15, 0.30] },

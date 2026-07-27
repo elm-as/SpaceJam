@@ -45,91 +45,50 @@ const starFragmentShader = `
 
 const bhVertexShader = `
     attribute float aSize;
-    attribute float aMass;
+    attribute vec3 aColor;
+    attribute float aAlpha;
     attribute float aFlash;
-    varying float vMass;
+    varying vec3 vColor;
+    varying float vAlpha;
     varying float vFlash;
     void main() {
-        vMass = aMass;
+        vColor = aColor;
+        vAlpha = aAlpha;
         vFlash = aFlash;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_PointSize = aSize * (800.0 / -mvPosition.z);
-        gl_PointSize = clamp(gl_PointSize, 20.0, 200.0);
+        gl_PointSize = clamp(gl_PointSize, 15.0, 80.0);
         gl_Position = projectionMatrix * mvPosition;
     }
 `;
 
 const bhFragmentShader = `
-    varying float vMass;
+    varying vec3 vColor;
+    varying float vAlpha;
     varying float vFlash;
     uniform float uTime;
-
-    float hash(vec2 p) {
-        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-    }
-    float noise(vec2 p) {
-        vec2 i = floor(p);
-        vec2 f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        float a = hash(i);
-        float b = hash(i + vec2(1.0, 0.0));
-        float c = hash(i + vec2(0.0, 1.0));
-        float d = hash(i + vec2(1.0, 1.0));
-        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    }
-
     void main() {
-        vec2 uv = gl_PointCoord - 0.5;
-        float d = length(uv);
+        vec2 c = gl_PointCoord - 0.5;
+        float d = length(c);
         if (d > 0.5) discard;
-        float angle = atan(uv.y, uv.x);
-
-        float ehRadius = 0.12;
-        float eventHorizon = 1.0 - smoothstep(ehRadius - 0.008, ehRadius + 0.004, d);
-
-        float pr1Center = 0.145;
-        float pr1 = exp(-pow((d - pr1Center) / 0.008, 2.0));
-        float pr2Center = 0.155;
-        float pr2 = exp(-pow((d - pr2Center) / 0.012, 2.0)) * 0.6;
-        float prTurb = noise(vec2(angle * 4.0 + uTime * 0.8, d * 30.0));
-        float photonRing = (pr1 + pr2) * (0.75 + 0.25 * prTurb);
-
-        float diskMask = smoothstep(0.42, 0.16, d) * (1.0 - eventHorizon);
-        float spiral1 = sin(angle * 3.0 - d * 18.0 + uTime * 1.2);
-        float spiral2 = sin(angle * 5.0 + d * 25.0 - uTime * 0.7) * 0.4;
-        float diskNoise = noise(vec2(angle * 2.0 + uTime * 0.3, d * 10.0));
-        float accDisk = diskMask * (0.4 + 0.3 * spiral1 + spiral2 * 0.2 + diskNoise * 0.2);
-        float doppler = 0.6 + 0.4 * sin(angle + 1.2);
-        accDisk *= doppler;
-
-        float halo = exp(-d * 4.5) * 0.15 * (1.0 - eventHorizon);
-        float outerGlow = exp(-pow((d - 0.35) / 0.12, 2.0)) * 0.06;
-
-        float flashRing = vFlash * exp(-pow((d - 0.2) / 0.06, 2.0));
-        float flashCore = vFlash * exp(-d * 12.0) * 0.5;
-        float flashTotal = flashRing + flashCore;
-
+        float eventHorizon = smoothstep(0.15, 0.12, d);
+        float shadow = 1.0 - eventHorizon;
+        float ringCenter = 0.22;
+        float ringWidth = 0.03;
+        float photonRing = exp(-pow((d - ringCenter) / ringWidth, 2.0));
+        float angle = atan(c.y, c.x);
+        float ringMod = 0.8 + 0.2 * sin(angle * 3.0 + uTime * 2.0);
+        float accDisk = smoothstep(0.45, 0.18, d) * (0.5 + 0.5 * sin(angle * 2.0 + d * 12.0));
+        accDisk *= (1.0 - eventHorizon);
+        float flash = vFlash * exp(-d * 8.0) * smoothstep(0.0, 0.4, d);
         vec3 col = vec3(0.0);
-        col += vec3(0.95, 0.75, 0.3) * photonRing * 2.0;
-        vec3 diskHot = vec3(1.0, 0.55, 0.12);
-        vec3 diskCool = vec3(0.8, 0.2, 0.05);
-        vec3 diskColor = mix(diskHot, diskCool, smoothstep(0.16, 0.40, d));
-        col += diskColor * accDisk * doppler * 1.2;
-        col += vec3(0.4, 0.25, 0.6) * halo;
-        col += vec3(0.3, 0.15, 0.5) * outerGlow;
-        col += vec3(1.0, 0.85, 0.5) * flashTotal * 3.0;
-
-        col *= (1.0 - eventHorizon);
-
-        float a = 0.0;
-        a += photonRing * 1.8;
-        a += accDisk * 0.8;
-        a += halo;
-        a += outerGlow;
-        a += flashTotal * 2.0;
-        a += eventHorizon * 0.95;
-        a = clamp(a, 0.0, 1.0);
-
+        col += vec3(0.0) * shadow;
+        col += vec3(1.0, 0.85, 0.4) * photonRing * ringMod * 1.2;
+        col += vec3(1.0, 0.45, 0.1) * accDisk * 0.6;
+        col += vec3(1.0, 0.9, 0.6) * flash * 2.0;
+        col += vec3(1.0) * exp(-d * 30.0) * 0.3;
+        float a = max(photonRing * ringMod, max(accDisk * 0.6, max(flash, exp(-d * 30.0) * 0.3)));
+        a = max(a, 0.15 * (1.0 - eventHorizon));
         gl_FragColor = vec4(col, a);
     }
 `;
@@ -142,6 +101,7 @@ class Renderer {
         this._trailUpdateCounter = 0;
         this._blackHoles = [];
         this._lowPerf = false;
+        // Detect perf mode from URL: ?perf=low
         if (typeof window !== 'undefined' && window.location && window.location.search) {
             const params = new URLSearchParams(window.location.search);
             if (params.get('perf') === 'low') this._lowPerf = true;
@@ -189,8 +149,8 @@ class Renderer {
     }
 
     _initRenderer() {
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.0;
@@ -200,6 +160,7 @@ class Renderer {
     _initPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
+        // Reduced bloom in perf/low mode to save FPS when needed
         const bloomStrength = this._lowPerf ? 1.0 : 2.2;
         const bloomRadius = this._lowPerf ? 0.2 : 0.4;
         const bloomThreshold = this._lowPerf ? 0.4 : 0.6;
@@ -208,15 +169,6 @@ class Renderer {
             bloomStrength, bloomRadius, bloomThreshold
         );
         this.composer.addPass(this.bloomPass);
-    }
-
-    setLowPerf(isLow) {
-        this._lowPerf = isLow;
-        if (this.bloomPass) {
-            this.bloomPass.strength = isLow ? 1.0 : 2.2;
-            this.bloomPass.radius = isLow ? 0.2 : 0.4;
-            this.bloomPass.threshold = isLow ? 0.4 : 0.6;
-        }
     }
 
     _initControls() {
@@ -254,12 +206,14 @@ class Renderer {
     _initBlackHoleSystem() {
         const pos = new Float32Array(MAX_BH * 3);
         const sizes = new Float32Array(MAX_BH);
-        const mass = new Float32Array(MAX_BH);
+        const colors = new Float32Array(MAX_BH * 3);
+        const alphas = new Float32Array(MAX_BH);
         const flash = new Float32Array(MAX_BH);
         this._bhGeo = new THREE.BufferGeometry();
         this._bhGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         this._bhGeo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
-        this._bhGeo.setAttribute('aMass', new THREE.BufferAttribute(mass, 1));
+        this._bhGeo.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+        this._bhGeo.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
         this._bhGeo.setAttribute('aFlash', new THREE.BufferAttribute(flash, 1));
         this._bhMat = new THREE.ShaderMaterial({
             vertexShader: bhVertexShader, fragmentShader: bhFragmentShader,
@@ -269,63 +223,111 @@ class Renderer {
         this.scene.add(new THREE.Points(this._bhGeo, this._bhMat));
     }
 
-    updateParticles(particles, blackHoles, cameraPos) {
+    updateFromPhysics(phys, cameraPos) {
         const pos = this._starGeo.attributes.position.array;
         const sizes = this._starGeo.attributes.aSize.array;
         const colors = this._starGeo.attributes.aColor.array;
         const alphas = this._starGeo.attributes.aAlpha.array;
         const accretion = this._starGeo.attributes.aAccretion.array;
+
         let idx = 0;
-        const maxDraw = this._lowPerf ? Math.min(MAX_PARTICLES, 15000) : MAX_PARTICLES;
-        for (const s of particles) {
-            if (idx >= maxDraw) break;
-            const dx = s.x - cameraPos.x;
-            const dy = s.y - cameraPos.y;
-            const dz = s.z - cameraPos.z;
-            const distCam = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            if (distCam > 1500 || (this._lowPerf && distCam > 800)) continue;
-            let lodFactor = 1.0;
-            if (distCam > 1000) lodFactor = 0.4;
-            else if (distCam > 500) lodFactor = 0.7;
+        const aliveGalaxies = phys.galaxies.filter(g => g.alive);
+        const camX = cameraPos.x, camY = cameraPos.y, camZ = cameraPos.z;
 
-            pos[idx*3] = s.x; pos[idx*3+1] = s.y; pos[idx*3+2] = s.z;
-            const r = s.colorR ?? 1.0, g = s.colorG ?? 1.0, b = s.colorB ?? 1.0;
-            colors[idx*3] = r; colors[idx*3+1] = g; colors[idx*3+2] = b;
-            const intrinsic = s.starSize ?? 1.0;
-            const speed = Math.sqrt(s.vx**2 + s.vy**2 + s.vz**2);
-            const rawSize = intrinsic * (1.5 + Math.min(speed * 0.1, 2.0)) * lodFactor;
-            sizes[idx] = Math.min(rawSize, 5.0);
+        for (let gi = 0; gi < aliveGalaxies.length; gi++) {
+            const g = aliveGalaxies[gi];
+            const stars = g.stars;
+            const gux = g.ux, guy = g.uy, guz = g.uz;
+            const gwx = g._wx, gwy = g._wy, gwz = g._wz;
+            const gox = g.ox, goy = g.oy, goz = g.oz;
+            const gx = g.x, gy = g.y, gz = g.z;
+            const dc = g.dominantColor;
+            const ageBias = g.stellarAge * 0.5;
 
-            const dist = s.distFromCenter || 10;
-            alphas[idx] = (0.5 + Math.min(0.5, dist * 0.004)) * lodFactor;
-            accretion[idx] = s.accretionGlow || 0;
-            idx++;
+            for (let si = 0; si < stars.length; si++) {
+                const s = stars[si];
+                if (!s.alive) continue;
+                if (idx >= MAX_PARTICLES) break;
+
+                const lx = s.lx, ly = s.ly, lz = s.lz;
+                const wx = lx * gux + ly * gwx + lz * gox + gx;
+                const wy = lx * guy + ly * gwy + lz * goy + gy;
+                const wz = lx * guz + ly * gwz + lz * goz + gz;
+
+                const dx = wx - camX;
+                const dy = wy - camY;
+                const dz = wz - camZ;
+                const distCamSq = dx * dx + dy * dy + dz * dz;
+
+                if (distCamSq > 2250000) continue; // > 1500
+
+                let lodFactor = 1.0;
+                if (distCamSq > 1000000) lodFactor = 0.4;
+                else if (distCamSq > 250000) lodFactor = 0.7;
+
+                const i3 = idx * 3;
+                pos[i3]     = wx;
+                pos[i3 + 1] = wy;
+                pos[i3 + 2] = wz;
+
+                const sp = s.spectral;
+                let sr = 1.0, sg = 0.95, sb = 0.75;
+                if (sp < 0.08)       { sr = 0.6;  sg = 0.7;  sb = 1.0; }
+                else if (sp < 0.20)  { sr = 0.7;  sg = 0.8;  sb = 1.0; }
+                else if (sp < 0.35)  { sr = 0.85; sg = 0.90; sb = 1.0; }
+                else if (sp < 0.55)  { sr = 1.0;  sg = 0.95; sb = 0.75; }
+                else if (sp < 0.75)  { sr = 1.0;  sg = 0.65; sb = 0.35; }
+                else                 { sr = 1.0;  sg = 0.30; sb = 0.15; }
+
+                const cr = sr * 0.65 + dc[0] * 0.35 + ageBias * (1 - sr) * 0.3;
+                const cg = sg * 0.65 + dc[1] * 0.35 - ageBias * sg * 0.15;
+                const cb = sb * 0.65 + dc[2] * 0.35 - ageBias * sb * 0.4;
+
+                colors[i3]     = Math.min(1, Math.max(0, cr));
+                colors[i3 + 1] = Math.min(1, Math.max(0, cg));
+                colors[i3 + 2] = Math.min(1, Math.max(0, cb));
+
+                const lvx = s.lvx, lvy = s.lvy, lvz = s.lvz;
+                const speed = Math.sqrt(lvx * lvx + lvy * lvy + lvz * lvz);
+                const rawSize = s.size * (1.5 + Math.min(speed * 0.1, 2.0)) * lodFactor;
+                sizes[idx] = Math.min(rawSize, 5.0);
+
+                const distCenter = Math.sqrt(lx * lx + ly * ly + lz * lz);
+                alphas[idx] = (0.5 + Math.min(0.5, distCenter * 0.004)) * lodFactor;
+                accretion[idx] = s.glow || 0;
+
+                idx++;
+            }
         }
+
         this._starGeo.attributes.position.needsUpdate = true;
         this._starGeo.attributes.aSize.needsUpdate = true;
         this._starGeo.attributes.aColor.needsUpdate = true;
         this._starGeo.attributes.aAlpha.needsUpdate = true;
         this._starGeo.attributes.aAccretion.needsUpdate = true;
         this._starGeo.setDrawRange(0, idx);
-        this._updateBlackHoles(blackHoles);
+
+        this._updateBlackHoles(aliveGalaxies);
         this._trailUpdateCounter++;
-        if (this._trailUpdateCounter % 4 === 0) this._updateTrails();
+        if (this._trailUpdateCounter % 4 === 0) this._updateTrails(aliveGalaxies);
     }
 
-    _updateBlackHoles(blackHoles) {
+    _updateBlackHoles(galaxies) {
         const pos = this._bhGeo.attributes.position.array;
         const sizes = this._bhGeo.attributes.aSize.array;
-        const mass = this._bhGeo.attributes.aMass.array;
+        const colors = this._bhGeo.attributes.aColor.array;
+        const alphas = this._bhGeo.attributes.aAlpha.array;
         const flash = this._bhGeo.attributes.aFlash.array;
         let idx = 0;
         this._blackHoles = [];
-        for (const bh of blackHoles) {
-            if (!bh.alive) continue;
+        for (const gal of galaxies) {
+            if (!gal.alive || !gal.bh || !gal.bh.alive) continue;
+            const bh = gal.bh;
             this._blackHoles.push(bh);
             pos[idx*3] = bh.x; pos[idx*3+1] = bh.y; pos[idx*3+2] = bh.z;
-            const m = bh.mass;
-            sizes[idx] = 12 + Math.log2(1 + m) * 4.0 + (bh.mergedFlash || 0) * 8.0;
-            mass[idx] = m;
+            sizes[idx] = 15 + Math.sqrt(bh.mass) * 0.3;
+            colors[idx*3] = 1.0; colors[idx*3+1] = 0.5; colors[idx*3+2] = 0.15;
+            alphas[idx] = 0.95;
             flash[idx] = bh.mergedFlash || 0;
             bh.trail.push([bh.x, bh.y, bh.z]);
             if (bh.trail.length > bh.trailMax) bh.trail.shift();
@@ -333,12 +335,13 @@ class Renderer {
         }
         this._bhGeo.attributes.position.needsUpdate = true;
         this._bhGeo.attributes.aSize.needsUpdate = true;
-        this._bhGeo.attributes.aMass.needsUpdate = true;
+        this._bhGeo.attributes.aColor.needsUpdate = true;
+        this._bhGeo.attributes.aAlpha.needsUpdate = true;
         this._bhGeo.attributes.aFlash.needsUpdate = true;
         this._bhGeo.setDrawRange(0, idx);
     }
 
-    _updateTrails() {
+    _updateTrails(galaxies) {
         for (const t of this._trails) { this.scene.remove(t); t.geometry.dispose(); t.material.dispose(); }
         this._trails = [];
         if (!this.showTrails) return;
@@ -373,7 +376,11 @@ class Renderer {
     render() {
         this._bhMat.uniforms.uTime.value = performance.now() * 0.001;
         this.controls.update();
-        this.composer.render();
+        if (this.bloomPass && this.bloomPass.strength > 0.05) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 
     _onResize() {

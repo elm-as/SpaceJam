@@ -6,6 +6,7 @@ const V_MAX      = 22;
 const V_MAX2     = V_MAX * V_MAX;
 const ORBIT_DAMP = 0.9998;
 
+// ─── Star ─────────────────────────────────────────────────────────────────────
 class Star {
     constructor(lx, ly, lz, lvx, lvy, lvz) {
         this.lx = lx; this.ly = ly; this.lz = lz;
@@ -13,16 +14,19 @@ class Star {
         this.lax = 0; this.lay = 0; this.laz = 0;
         this.lax0 = 0; this.lay0 = 0; this.laz0 = 0;
         this.alive = true; this.glow = 0;
-        // IMF simplifiée
+        // Taille intrinsèque de l'étoile : distribution réaliste (IMF simplifiée)
+        // La plupart sont petites, quelques-unes très grandes
         const r = Math.random();
         if (r < 0.60)       this.size = 0.4 + Math.random() * 0.4;   // naines (60%)
         else if (r < 0.85)  this.size = 0.9 + Math.random() * 0.6;   // solaires (25%)
         else if (r < 0.96)  this.size = 1.6 + Math.random() * 1.2;   // géantes (11%)
         else                this.size = 3.0 + Math.random() * 2.5;    // supergéantes (4%)
+        // Température / couleur spectrale intrinsèque (O,B,A,F,G,K,M)
         this.spectral = Math.random(); // 0=bleu chaud, 1=rouge froid
     }
 }
 
+// ─── BlackHole ────────────────────────────────────────────────────────────────
 class BlackHole {
     static _id = 0;
     constructor(x, y, z, mass) {
@@ -33,9 +37,11 @@ class BlackHole {
     }
     get rh() { return Math.pow(G * this.mass * 0.01, 1 / 3); }
     get ra() { return this.rh * 25; }
+    // Rayon de destruction très petit : seulement les étoiles vraiment au cœur du TN
     get rTidal() { return Math.max(1.5, this.rh * 2); }
 }
 
+// ─── Galaxy ───────────────────────────────────────────────────────────────────
 class Galaxy {
     static _id = 0;
 
@@ -47,7 +53,9 @@ class Galaxy {
         this.ax0 = 0; this.ay0 = 0; this.az0 = 0;
         this.type = type; this.preset = preset;
         this.alive = true; this.stars = []; this.bh = null; this._merging = false;
+        // Couleur dominante héritée ou définie par type
         this.dominantColor = mergeData?.dominantColor || this._defaultColor(type);
+        // Âge stellaire moyen (0=jeune/bleu, 1=vieux/rouge)
         this.stellarAge = mergeData?.stellarAge ?? this._defaultAge(type);
         this._setupOrientation();
         this._initMasses(preset);
@@ -57,10 +65,12 @@ class Galaxy {
         this.gasFraction = this._initGasFraction(type);
         this.morphologyTransition = { active: false, t: 0, duration: 5.0 };
         this.starFormationCooldown = 0;
+        // Compteur destruction pour stats
         this.destroyedCount = 0;
     }
 
     _defaultColor(type) {
+        // [r,g,b] couleur dominante des étoiles selon le type
         return {
             spiral:     [0.45, 0.65, 1.0],
             barred:     [1.0,  0.78, 0.25],
@@ -71,6 +81,7 @@ class Galaxy {
     }
 
     _defaultAge(type) {
+        // 0=jeune, 1=vieux
         return { spiral: 0.3, barred: 0.45, elliptical: 0.85, lenticular: 0.65, irregular: 0.15 }[type] ?? 0.5;
     }
 
@@ -139,12 +150,19 @@ class Galaxy {
         const xd = R / (this.Rd + 0.001);
         const mDE = this.Mdisk * (1 - (1 + xd) * Math.exp(-xd));
         const fDisk  = G * mDE / R2;
-        const v200sq = G * this.Mhalo / (this.Rh + 0.001);
-        const fHalo  = v200sq * R * R / (R2 + this.Rh * this.Rh);
+        
+        // NFW Halo circular velocity contribution
+        const rsNFW = Math.max(1.0, this.Rh * 0.4);
+        const xNFW = R / rsNFW;
+        const nfwFactor = (Math.log(1 + xNFW) - (xNFW / (1 + xNFW)));
+        const nfwNorm = 0.524;
+        const fHalo  = (G * this.Mhalo * nfwFactor) / (R * nfwNorm + 1e-4);
+        
         return Math.sqrt(Math.max(fBH + fBulge + fDisk + fHalo, 1e-6));
     }
 
     _generate() {
+        // Augmentation du nombre d'étoiles (x1.5 vs preset)
         const N = Math.floor(this.preset.N * rand(0.85, 1.15) * 1.5);
         for (let i = 0; i < N; i++) {
             let lx, ly, lz, lvx, lvy, lvz;
@@ -176,24 +194,29 @@ class Galaxy {
         }
     }
 
+    // ── Couleur d'une étoile selon type galactique + propriétés stellaires ────
     getStarColor(star, dist) {
+        // Couleur spectrale intrinsèque de l'étoile
         const sp = star.spectral;
         let sr, sg, sb;
-        if (sp < 0.08) {        // O
+        if (sp < 0.08) {        // O - bleu très chaud
             sr = 0.6; sg = 0.7; sb = 1.0;
-        } else if (sp < 0.20) { // B
+        } else if (sp < 0.20) { // B - bleu-blanc
             sr = 0.7; sg = 0.8; sb = 1.0;
-        } else if (sp < 0.35) { // A
+        } else if (sp < 0.35) { // A - blanc-bleu
             sr = 0.85; sg = 0.90; sb = 1.0;
-        } else if (sp < 0.55) { // F/G
+        } else if (sp < 0.55) { // F/G - blanc-jaune (solaire)
             sr = 1.0; sg = 0.95; sb = 0.75;
-        } else if (sp < 0.75) { // K
+        } else if (sp < 0.75) { // K - orange
             sr = 1.0; sg = 0.65; sb = 0.35;
-        } else {                // M
+        } else {                // M - rouge froid
             sr = 1.0; sg = 0.30; sb = 0.15;
         }
+
+        // Influence de la couleur dominante de la galaxie (mélange partiel)
         const dc = this.dominantColor;
-        const age = this.stellarAge;
+        const age = this.stellarAge; // 0=jeune(bleu), 1=vieux(rouge)
+        // Les vieilles galaxies ont moins d'étoiles bleues → décaler vers rouge
         const ageBias = age * 0.5;
         const mix = 0.35;
         const r = sr * (1 - mix) + dc[0] * mix + ageBias * (1 - sr) * 0.3;
@@ -203,15 +226,34 @@ class Galaxy {
         return [Math.min(1, Math.max(0, r)), Math.min(1, Math.max(0, g)), Math.min(1, Math.max(0, b))];
     }
 
+    // ── Accélérations locales ─────────────────────────────────────────────────
     computeAccelerations(allBHs, otherGalaxies, enableTides) {
         const bh = this.bh;
         const aCenMag2 = this.ax * this.ax + this.ay * this.ay + this.az * this.az;
         const applyFictitious = !this._merging && aCenMag2 < 0.25;
         let fixAx = 0, fixAy = 0, fixAz = 0;
         if (applyFictitious) {
-            [fixAx, fixAy, fixAz] = this._worldToLocalVel(this.ax, this.ay, this.az);
+            fixAx = this.ax * this.ux + this.ay * this.uy + this.az * this.uz;
+            fixAy = this.ax * this._wx + this.ay * this._wy + this.az * this._wz;
+            fixAz = this.ax * this.ox + this.ay * this.oy + this.az * this.oz;
         }
+
         const rTidal2 = bh.rTidal * bh.rTidal;
+        const G_Mbh = G * bh.mass;
+        const G_Mbulge = G * this.Mbulge;
+        const Rb2 = this.Rb * this.Rb;
+        const rsNFW = Math.max(1.0, this.Rh * 0.4);
+        const invRsNFW = 1.0 / rsNFW;
+        const G_Mhalo_norm = (G * this.Mhalo) / 0.524;
+        const invRd = 1.0 / (this.Rd + 0.001);
+        const G_Mdisk = G * this.Mdisk;
+
+        const gux = this.ux, guy = this.uy, guz = this.uz;
+        const gwx = this._wx, gwy = this._wy, gwz = this._wz;
+        const gox = this.ox, goy = this.oy, goz = this.oz;
+        const gx = this.x, gy = this.y, gz = this.z;
+
+        const activeOthers = (enableTides && !this._merging) ? otherGalaxies.filter(o => o !== this && o.alive) : [];
 
         for (const star of this.stars) {
             if (!star.alive) continue;
@@ -222,61 +264,53 @@ class Galaxy {
             const R2 = Rtrue2 + SOFT_STAR * SOFT_STAR;
             const R  = Math.sqrt(R2);
 
-            let accreted = false;
-            const [wx, wy, wz] = this._localToWorld(lx, ly, lz);
-            for (const obh of allBHs) {
-                if (!obh.alive) continue;
-                const rTidal2_other = obh.rTidal * obh.rTidal;
-                const dx = obh.x - wx, dy = obh.y - wy, dz = obh.z - wz;
-                if (dx*dx + dy*dy + dz*dz < rTidal2_other && Math.random() < 0.003) {
-                    star.alive = false;
-                    this.destroyedCount++;
-                    obh.mass += star.size * 0.001;
-                    obh.mergedFlash = Math.min(1.0, (obh.mergedFlash || 0) + 0.08);
-                    accreted = true;
-                    break;
-                }
+            if (Rtrue2 < rTidal2 && Math.random() < 0.003) {
+                star.alive = false;
+                this.destroyedCount++;
+                bh.mass += star.size * 0.001;
+                bh.mergedFlash = Math.min(1.0, bh.mergedFlash + 0.08);
+                continue;
             }
-            if (accreted) continue;
 
             const invR3 = 1 / (R2 * R);
-            const fBH    = G * bh.mass * invR3;
-            const fBulge = G * this.Mbulge / Math.pow(R2 + this.Rb * this.Rb, 1.5);
-            const v200sq = G * this.Mhalo / (this.Rh + 0.001);
-            const fHalo  = v200sq / (R2 + this.Rh * this.Rh);
-            const xd = R / (this.Rd + 0.001);
-            const mDE = this.Mdisk * (1 - (1 + xd) * Math.exp(-xd));
-            const fDisk = G * mDE * invR3;
+            const fBH = G_Mbh * invR3;
+            const Rb2R2 = R2 + Rb2;
+            const fBulge = G_Mbulge / (Rb2R2 * Math.sqrt(Rb2R2));
+
+            const xNFW = R * invRsNFW;
+            const nfwFactor = (Math.log(1 + xNFW) - (xNFW / (1 + xNFW)));
+            const fHalo = (G_Mhalo_norm * nfwFactor) / (R2 * R + 1e-4);
+
+            const xd = R * invRd;
+            const mDE = G_Mdisk * (1 - (1 + xd) * Math.exp(-xd));
+            const fDisk = mDE * invR3;
 
             let ax = -(fBH + fBulge + fHalo + fDisk) * lx;
             let ay = -(fBH + fBulge + fHalo + fDisk) * ly;
             let az = -(fBH + fBulge + fHalo + fDisk) * lz;
 
-            if (enableTides && !this._merging) {
-                const [sx, sy, sz] = this._localToWorld(lx, ly, lz);
-                for (const obh of allBHs) {
-                    if (obh === bh || !obh.alive) continue;
-                    const dx = obh.x - sx, dy = obh.y - sy, dz = obh.z - sz;
-                    const d2 = dx * dx + dy * dy + dz * dz + SOFT_TIDAL * SOFT_TIDAL, d = Math.sqrt(d2);
-                    const ft = G * obh.mass / (d2 * d);
-                    const fwx = ft * dx, fwy = ft * dy, fwz = ft * dz;
-                    const dx0 = obh.x - this.x, dy0 = obh.y - this.y, dz0 = obh.z - this.z;
-                    const d02 = dx0 * dx0 + dy0 * dy0 + dz0 * dz0 + SOFT_TIDAL * SOFT_TIDAL, d0 = Math.sqrt(d02);
-                    const ft0 = G * obh.mass / (d02 * d0);
-                    const [tlx, tly, tlz] = this._worldToLocalVel(fwx - ft0 * dx0, fwy - ft0 * dy0, fwz - ft0 * dz0);
-                    ax += tlx; ay += tly; az += tlz;
-                }
-                for (const other of otherGalaxies) {
-                    if (other === this || !other.alive) continue;
+            if (activeOthers.length > 0) {
+                const sx = lx * gux + ly * gwx + lz * gox + gx;
+                const sy = lx * guy + ly * gwy + lz * goy + gy;
+                const sz = lx * guz + ly * gwz + lz * goz + gz;
+
+                for (let k = 0; k < activeOthers.length; k++) {
+                    const other = activeOthers[k];
                     const dx = other.x - sx, dy = other.y - sy, dz = other.z - sz;
                     const d2 = dx * dx + dy * dy + dz * dz + SOFT_TIDAL * SOFT_TIDAL, d = Math.sqrt(d2);
                     const ft = G * other.Mtot / (d2 * d);
                     const fwx = ft * dx, fwy = ft * dy, fwz = ft * dz;
-                    const dx0 = other.x - this.x, dy0 = other.y - this.y, dz0 = other.z - this.z;
+                    const dx0 = other.x - gx, dy0 = other.y - gy, dz0 = other.z - gz;
                     const d02 = dx0 * dx0 + dy0 * dy0 + dz0 * dz0 + SOFT_TIDAL * SOFT_TIDAL, d0 = Math.sqrt(d02);
                     const ft0 = G * other.Mtot / (d02 * d0);
-                    const [tlx, tly, tlz] = this._worldToLocalVel(fwx - ft0 * dx0, fwy - ft0 * dy0, fwz - ft0 * dz0);
-                    ax += tlx; ay += tly; az += tlz;
+
+                    const dfx = fwx - ft0 * dx0;
+                    const dfy = fwy - ft0 * dy0;
+                    const dfz = fwz - ft0 * dz0;
+
+                    ax += dfx * gux + dfy * guy + dfz * guz;
+                    ay += dfx * gwx + dfy * gwy + dfz * gwz;
+                    az += dfx * gox + dfy * goy + dfz * goz;
                 }
             }
 
@@ -286,7 +320,10 @@ class Galaxy {
         }
     }
 
+    // ── Collisions étoile-étoile (simplifié, grille spatiale approx.) ─────────
     checkStarCollisions() {
+        // Seulement sur un sous-ensemble aléatoire pour rester temps-réel
+        // On vérifie uniquement les paires proches (cellule ~2 unités)
         const CELL = 3.0;
         const grid = new Map();
         const alive = this.stars.filter(s => s.alive);
@@ -304,8 +341,10 @@ class Galaxy {
                     if (!a.alive || !b.alive) continue;
                     const dx = a.lx - b.lx, dy = a.ly - b.ly, dz = a.lz - b.lz;
                     const d2 = dx * dx + dy * dy + dz * dz;
+                    // Rayon de collision dépend des tailles (très petites : jamais)
                     const threshold = (a.size + b.size) * 0.15;
                     if (d2 < threshold * threshold) {
+                        // Collision : la plus grande absorbe la plus petite
                         if (a.size >= b.size) {
                             a.size = Math.min(5.5, a.size + b.size * 0.1);
                             b.alive = false; this.destroyedCount++;
@@ -348,8 +387,8 @@ class Galaxy {
                 galaxyType: this.type,
                 vx: star.lvx, vy: star.lvy, vz: star.lvz,
                 accretionGlow: star.glow,
-                starSize: star.size,
-                colorR: r, colorG: g, colorB: b,
+                starSize: star.size,   // taille intrinsèque transmise au renderer
+                colorR: r, colorG: g, colorB: b,  // couleur pré-calculée
             });
         }
         return out;

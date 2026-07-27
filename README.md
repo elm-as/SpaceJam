@@ -1,166 +1,62 @@
-# ✦ SpaceJam — Simulateur de Collisions Galactiques
+# SpaceJam — Simulateur de Galaxies
 
-> *« L'espace, c'est une vraie galère… mais maintenant je le sais. »*
+Contexte
+SpaceJam est un petit simulateur de galaxies. L’espace est complexe et plein d’astres interagissant; ce projet vise surtout à offrir une expérience visuelle convaincante et interactive plutôt qu’une précision physique absolue. Le travail est né d’un besoin de tester des dynamiques simples (collision/ fusion, agitation des étoiles) tout en restant lisible et maintenable. L’objectif est d’avoir quelque chose de stable et ludique, sans viser une simulation astrophysique ultra-réaliste.
 
-Une simulation interactive de dynamique galactique en temps réel, construite avec Three.js. Observez des galaxies spirales, elliptiques et barrées s'attirer, se déformer, et fusionner sous l'effet de la gravité — avec rendu WebGL, bloom et shaders custom.
+Inspiration et compromis techniques
+Pour parvenir à une expérience suffisamment réaliste sans tomber dans une physique complexe, j’ai exploré des idées avec l’aide de modèles IA (ChatGPT). L’objectif était d’obtenir des comportements plausibles (fusions, effets de marée, mouvements autour des centres) tout en évitant les instabilités visuelles (centres qui s’éloignent trop, étoiles qui se dispersent). Le résultat est une approximation cohérente adaptée à une démonstration interactive.
 
----
+Utilisation et démarrage
+- Installation des dépendances: `npm install`.
+- Lancement du serveur de démonstration: `npm run start`.
+- Par défaut, le serveur écoute sur le port 8080. Accès: http://localhost:8080/
+- Si le port 8080 est occupé, lancer avec un port différent: `PORT=3000 npm run start` (ou l’équivalent sur Windows).
 
-## Aperçu
+- Musique de fond: place sampcrmr.mp3 à la racine SpaceJam (ou dans assets et ajuste le chemin). Le code cherche actuellement /sampcrmr.mp3 comme source principale. Si votre fichier est ailleurs, modifiez src/main.js pour pointer vers le bon chemin (ou ajoutez des chemins alternatifs dans la liste sources et testez les canaux).
 
-![Collision galactique](https://github.com/user-attachments/assets/761e88d3-0da7-4062-bd4e-64804ad318ed)
-![Centres en fuite](https://github.com/user-attachments/assets/fc551c2f-780d-49a3-b10b-9cb59fdf41dc)
+Objectifs du README
+- Décrire rapidement le contexte et l’objectif.
+- Proposer un flux de démarrage simple et reproductible.
+- Fournir une vue d’ensemble des fichiers importants et de leur rôle.
+- Donner des conseils de personnalisation et des limites connues.
 
----
+Contenu du code — Vue d’ensemble des fichiers
+- src/main.js: point d’entrée de l’application et boucle principale d’orchestration entre moteur physique, rendu et UI.
+- src/app-controller.js: logique de seed initial des galaxies; fournit seedInitialGalaxies(physics) et gère le fallback s’il est indisponible.
+- src/engine/constants.js: constantes globales, types de galaxie, et SIZE_PRESETS préconfigurés.
+- src/engine/utils.js: helpers utilitaires (picking aléatoire, valeurs aléatoires, gaussiennes).
+- src/engine/physics-engine.js: cœur du moteur physique; gestion des galaxies, des forces, des fusions et des évolutions temporelles.
+- src/engine/galaxy-objects.js: définition des objets Galaxy, Star, BlackHole et leurs comportements.
+- src/renderer.js: rendu 3D via Three.js, post-traitement et contrôles de caméra. Inclut notamment les shaders et le pipeline de rendu.
+- src/renderer/shaders.js: définitions des shaders (vertex/fragment) employés par le rendu (ou utilisés par renderer.js).
+- src/ui.js: interface utilisateur et bindings des composants (sliders, boutons, affichages de stats).
+- server.js: petit serveur statique Node pour servir les fichiers HTML/JS/CSS sans bundler; utilisé par le script start dans ce dépôt.
+- package.json: dépendances et scripts (start, build, test) et version du projet.
 
-## Installation rapide
+Note: les détails avancés des interactions (collisions exactes, forces fictives, accélérations) sont volontairement simplifiés afin de préserver une expérience fluide et lisible.
 
-```bash
-git clone https://github.com/Elm-as/SpaceJam.git
-cd SpaceJam
-npm install
-npm run start
-```
+Utilisation rapide
+- Installez les dépendances: `npm install`.
+- Lancez: `npm run start`.
+- Rendez-vous dans votre navigateur sur: http://localhost:8080/
 
-Puis ouvrir : [http://localhost:8080](http://localhost:8080)
+Personnalisation rapide
+- Pour changer la configuration des galaxies initiales ou leurs types, modifiez les seeds dans src/app-controller.js ou les SIZE_PRESETS dans src/engine/constants.js.
+- Le comportement par défaut est pensé pour rester stable en l’absence de paramètres avancés.
 
----
+Remarques finales
+- Si vous souhaitez une vraie build pour déploiement, il faudra ajouter un bundler (Vite/Webpack) et configurer des scripts de build; le serveur statique actuel est prévu pour des démonstrations locales.
+- Descriptions des fichiers
+  - src/main.js: Point d’entrée et orchestration; gère la boucle de rendu et lie la physique, le rendu et l’UI.
+  - src/app-controller.js: Seed initial des galaxies; exporte seedInitialGalaxies(physics) et gère le fallback.
+  - src/engine/constants.js: Définition des constantes (G, MERGE_DIST, etc.), types de galaxies et SIZE_PRESETS.
+  - src/engine/utils.js: Outils utilitaires (pick, rand, gauss).
+  - src/engine/physics-engine.js: Cœur du moteur; gestion des galaxies, calculs d’accélération, intégration et fusions.
+  - src/engine/galaxy-objects.js: Définitions des objets Galaxy, Star et BlackHole et leur comportement.
+  - src/renderer.js: Pipeline de rendu 3D avec Three.js et post-traitement; réagit aux paramètres UI et shaders.
+  - src/renderer/shaders.js: Déclarations des shaders (vertex/fragment) utilisés par le rendu.
+  - src/ui.js: Interface utilisateur et bindings des éléments (sliders, boutons, affichages).
+  - server.js: Serveur HTTP statique minimal pour servir les fichiers front-end.
+  - package.json: Dépendances et scripts (start, build, test).
 
-## Fonctionnalités
-
-- **5 types de galaxies** : spirale, barrée, elliptique, lenticulaire, irrégulière
-- **Physique temps réel** : intégration Velocity-Verlet, effets de marée, conservation du centre de masse
-- **Fusion de galaxies** : friction dynamique (Chandrasekhar), coalescence des trous noirs, redistribution des étoiles
-- **Formation stellaire** : nouvelles étoiles générées à partir du gaz résiduel
-- **Rendu WebGL** : shaders custom, bloom post-processing (UnrealBloom), LOD caméra
-- **Interface complète** : contrôle gravité, vitesse, bloom, pause/step, inversion du temps
-
----
-
-## Contrôles [ J'ai probablement foiré certains trucs, surtout Zoom ]
-
-| Touche / Action | Effet |
-|---|---|
-| `Z` / `↑` | Zoom avant |
-| `S` / `↓` | Zoom arrière |
-| `Q` / `←` | Rotation gauche |
-| `D` / `→` | Rotation droite |
-| `E` / `A` | Monter / Descendre |
-| `F` | Focus sur la galaxie la plus massive |
-| `Tab` | Cycler entre les galaxies |
-| `Espace` | Pause / Reprendre |
-| Clic gauche + drag | Rotation libre |
-| Clic droit + drag | Translation |
-| **Boutons UI** | Placement de nouvelles galaxies, scénarios, reset |
-
----
-
-## Architecture
-
-```
-SpaceJam/
-├── index.html                  Interface HTML + styles
-├── server.js                   Serveur HTTP statique (Node.js)
-├── src/
-│   ├── main.js                 Point d'entrée, boucle de rendu, événements
-│   ├── app-controller.js       Seed initial des galaxies
-│   ├── renderer.js             Pipeline Three.js + post-processing + shaders
-│   ├── ui.js                   Bindings UI (sliders, boutons, stats)
-│   └── engine/
-│       ├── constants.js        Constantes physiques (G, MERGE_DIST, SIZE_PRESETS…)
-│       ├── utils.js            Utilitaires (rand, gauss, pick)
-│       ├── galaxy-objects.js   Star, BlackHole, Galaxy — dynamique locale
-│       └── physics-engine.js   Moteur global : gravité, fusions, formation stellaire
-```
-
----
-
-## Physique implémentée [ On dit merci qui ? ChatGPT :) ]
-
-### Gravitation
-
-Loi de gravitation universelle avec softening pour éviter les singularités :
-
-```
-F = G · m₁ · m₂ / (r² + ε²)
-```
-
-### Courbe de rotation
-
-Vitesse circulaire composée (disque exponentiel + bulbe de Plummer + halo NFW simplifié + trou noir central) :
-
-```
-v(r) = √( G·Mbh/r² + G·Mbulge·r²/(r²+Rb²)^(3/2) + G·Mdisk·M(r)/r² + v²₂₀₀·r²/(r²+Rh²) )
-```
-
-### Intégration numérique
-
-Velocity-Verlet à deux passes par step pour une meilleure conservation de l'énergie :
-
-```
-x(t+dt) = x(t) + v·dt + ½·a₀·dt²
-v(t+dt) = v(t) + ½·(a₀ + a₁)·dt
-```
-
-### Effets de marée
-
-Force de marée = différence entre la force directe sur l'étoile et la force sur le centre galactique, projetée dans le référentiel local.
-
-### Fusion
-
-Critère : énergie orbitale négative `E = ½v²_rel − G·M/r < 0` et distance < seuil.  
-Phase de merge : friction dynamique exponentielle (`e^{-λt}`) + interpolation position → barycentre.
-
----
-
-## Personnalisation
-
-Modifier **`src/app-controller.js`** pour changer les galaxies initiales :
-
-```js
-physics.addGalaxy(x, y, z, vx, vy, vz, 'spiral', SIZE_PRESETS[2]);
-```
-
-Modifier **`src/engine/constants.js`** pour ajuster les paramètres globaux :
-
-```js
-export const G          = 1;         // constante gravitationnelle simulée
-export const MERGE_DIST = 18;        // distance de déclenchement de fusion
-export const SIZE_PRESETS = [ ... ]; // presets de taille/masse des galaxies
-```
-
----
-
-## Limitations connues
-
-- Les centres galactiques peuvent dériver lors de collisions asymétriques (partiellement compensé par correction du centre de masse)
-- Certaines étoiles s'échappent lors de fusions très énergétiques — comportement physiquement attendu mais visuellement discutable
-- Le bouton "Scénario Collision" positionne deux galaxies en trajectoire d'approche mais ne garantit pas la fusion (dépend des vitesses relatives)
-- Pas de relativité générale, pas d'hydrodynamique, pas de collisions étoile-étoile individuelles
-
----
-
-## Stack technique
-
-- [Three.js](https://threejs.org/) r164 — rendu WebGL, shaders, post-processing
-- JavaScript ES modules natifs (pas de bundler)
-- Node.js — serveur statique minimal
-
----
-
-## Avertissement honnête
-
-Ce projet est une approximation physique interactive, pas un simulateur astrophysique rigoureux. Certaines formules ont été adaptées ou simplifiées pour maintenir la stabilité numérique en temps réel. Une partie du code de physique a été générée avec assistance IA (ChatGPT) puis corrigée manuellement.
-
-Fichiers contenant du code assisté par IA (édité) :
-- `src/engine/physics-engine.js`
-- `src/engine/galaxy-objects.js`
-- `src/engine/constants.js`
-- `src/ui.js`
-- `README.md`
-
----
-
-## Licence
-
-[GNU General Public License v3.0](./LICENSE)
+Note: ces descriptions donnent une vue rapide du rôle de chaque fichier; pour comprendre le fonctionnement, lire le code source est recommandé.
