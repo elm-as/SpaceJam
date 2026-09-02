@@ -1,4 +1,5 @@
-# SpaceJam — Simulateur de Galaxies
+# SpaceJam — Simulateur de Galaxies 
+# Edit : J'ai gagné la SpaceJam
 
 Contexte
 SpaceJam est un petit simulateur de galaxies. L’espace est complexe et plein d’astres interagissant; ce projet vise surtout à offrir une expérience visuelle convaincante et interactive plutôt qu’une précision physique absolue. Le travail est né d’un besoin de tester des dynamiques simples (collision/ fusion, agitation des étoiles) tout en restant lisible et maintenable. L’objectif est d’avoir quelque chose de stable et ludique, sans viser une simulation astrophysique ultra-réaliste.
